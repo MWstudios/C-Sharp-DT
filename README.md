@@ -1,7 +1,7 @@
 # C#DT - a C# port of CDT
 This is a C# port of artem-ogre's [CDT library](https://github.com/artem-ogre/CDT). Make sure to read the original README, it contains more information.
 
-There are a few notable problems, such as CDT crashing and asserting at thin triangles when `m_minDistToConstraintEdge` is set to too low. However, there also may be some typos in my code. If you have found any other discrepancies or strange behavior, report it in Issues. _Be aware that any bug you have found could have existed on the C++ side as well, so make sure to test both._
+There are a few notable problems, such as CDT crashing and asserting at thin triangles when `minDistToConstraintEdge` is set to too low. However, there also may be some typos in my code. If you have found any other discrepancies or strange behavior, report it in Issues. _Be aware that any bug you have found could have existed on the C++ side as well, so make sure to test both._
 
 ## Adding to your project
 
