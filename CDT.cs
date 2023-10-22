@@ -64,7 +64,7 @@ public class Triangulation
             List<(int, double)> splitVerts = new(pieces.Count + 1);
             foreach (var pieceIt in pieces)
             {
-                FixedArray2<int> vv = new(pieceIt.iV1, pieceIt.iV2);
+                int[] vv = new int[] { pieceIt.iV1, pieceIt.iV2 };
                 for (int v = 0; v < 2; v++)
                 {
                     double c = isX ? vertices[vv[v]].X : vertices[vv[v]].Y;
@@ -267,8 +267,8 @@ public class Triangulation
         int v1 = t.vertices[i], v2 = t.vertices[Triangle.CCW(i)], n1 = t.neighbors[i], n3 = t.neighbors[Triangle.CW(i)];
         i = Triangle.OpposedVertexIndex(tOpo.neighbors, iT);
         int v3 = tOpo.vertices[i], v4 = tOpo.vertices[Triangle.CCW(i)], n4 = tOpo.neighbors[i], n2 = tOpo.neighbors[Triangle.CW(i)];
-        triangles[iT] = new() { vertices = new(v4, v1, v3), neighbors = new(n3, iTopo, n4) };
-        triangles[iTopo] = new() { vertices = new(v2, v3, v1), neighbors = new(n2, iT, n1) };
+        triangles[iT] = new() { vertices = new[] { v4, v1, v3 }, neighbors = new[] { n3, iTopo, n4 } };
+        triangles[iTopo] = new() { vertices = new[] { v2, v3, v1 }, neighbors = new[] { n2, iT, n1 } };
         ChangeNeighbor(n1, iT, iTopo); ChangeNeighbor(n4, iTopo, iT);
         if (!IsFinalized()) { SetAdjancentTriangle(v4, iT); SetAdjancentTriangle(v2, iTopo); }
     }
@@ -290,8 +290,8 @@ public class Triangulation
      */
     public void FlipEdge(int iT, int iTopo, int v1, int v2, int v3, int v4, int n1, int n2, int n3, int n4)
     {
-        triangles[iT] = new() { vertices = new(v4, v1, v3), neighbors = new(n3, iTopo, n4) };
-        triangles[iTopo] = new() { vertices = new(v2, v3, v1), neighbors = new(n2, iT, n1) };
+        triangles[iT] = new() { vertices = new[] { v4, v1, v3 }, neighbors = new[] { n3, iTopo, n4 } };
+        triangles[iTopo] = new() { vertices = new[] { v2, v3, v1 }, neighbors = new[] { n2, iT, n1 } };
         ChangeNeighbor(n1, iT, iTopo); ChangeNeighbor(n4, iTopo, iT);
         if (!IsFinalized()) { SetAdjancentTriangle(v4, iT); SetAdjancentTriangle(v2, iTopo); }
     }
@@ -319,7 +319,7 @@ public class Triangulation
         double r = Vector2.Distance(box.max, box.min) / 2 * 1.1, R = r * 2, shiftX = R * Math.Sqrt(3) / 2;
         Vector2 posV1 = center - new Vector2(shiftX, r), posV2 = center + new Vector2(shiftX, -r), posV3 = center + new Vector2(0, R);
         AddNewVertex(posV1, 0); AddNewVertex(posV2, 0); AddNewVertex(posV3, 0);
-        AddTriangle(new() { vertices = new(0, 1, 2), neighbors = new(noNeighbor, noNeighbor, noNeighbor) });
+        AddTriangle(new() { vertices = new[] { 0, 1, 2 }, neighbors = new[] { noNeighbor, noNeighbor, noNeighbor } });
         if (m_vertexInsertionOrder != VertexInsertionOrder.Auto) m_nearPtLocator = new(vertices);
     }
     void AddNewVertex(Vector2 pos, int iT) { vertices.Add(pos); m_vertTris.Add(iT); }
@@ -330,7 +330,7 @@ public class Triangulation
     }
     void InsertVertex(int iVert, int walkStart)
     {
-        Vector2 v = vertices[iVert]; FixedArray2<int> trisAt = WalkingSearchTriangleAt(v, walkStart);
+        Vector2 v = vertices[iVert]; int[] trisAt = WalkingSearchTriangleAt(v, walkStart);
         Stack<int> triStack = trisAt[1] == noNeighbor ? InsertVertexInsideTriangle(iVert, trisAt[0]) : InsertVertexOnEdge(iVert, trisAt[0], trisAt[1]);
         EnsureDelaunayByEdgeFlips(v, iVert, triStack);
     }
@@ -349,7 +349,7 @@ public class Triangulation
     List<Edge> InsertVertex_FlipFixedEdges(int iV1)
     {
         List<Edge> flippedFixedEdges = new(); Vector2 v1 = vertices[iV1]; int startVertex = m_nearPtLocator.Nearest(v1, vertices).Item2;
-        FixedArray2<int> trisAt = WalkingSearchTriangleAt(v1, startVertex);
+        int[] trisAt = WalkingSearchTriangleAt(v1, startVertex);
         Stack<int> triStack = trisAt[1] == noNeighbor ? InsertVertexInsideTriangle(iV1, trisAt[0]) : InsertVertexOnEdge(iV1, trisAt[0], trisAt[1]);
         while (triStack.Count > 0)
         {
@@ -577,10 +577,10 @@ public class Triangulation
     {
         int iNewT1 = AddTriangle(), iNewT2 = AddTriangle();
         Triangle t = triangles[iT];
-        FixedArray3<int> vv = t.vertices, nn = t.neighbors;
-        triangles[iNewT1] = new() { vertices = new(vv[1], vv[2], v), neighbors = new(nn[1], iNewT2, iT) };
-        triangles[iNewT2] = new() { vertices = new(vv[2], vv[0], v), neighbors = new(nn[2], iT, iNewT1) };
-        triangles[iT] = new() { vertices = new(vv[0], vv[1], v), neighbors = new(nn[0], iNewT1, iNewT2) };
+        int[] vv = t.vertices, nn = t.neighbors;
+        triangles[iNewT1] = new() { vertices = new[] { vv[1], vv[2], v }, neighbors = new[] { nn[1], iNewT2, iT } };
+        triangles[iNewT2] = new() { vertices = new[] { vv[2], vv[0], v }, neighbors = new[] { nn[2], iT, iNewT1 } };
+        triangles[iT] = new() { vertices = new[] { vv[0], vv[1], v }, neighbors = new[] { nn[0], iNewT1, iNewT2 } };
         SetAdjancentTriangle(v, iT); SetAdjancentTriangle(vv[2], iNewT1);
         ChangeNeighbor(nn[1], iT, iNewT1); ChangeNeighbor(nn[2], iT, iNewT2);
         Stack<int> newTriangles = new(); newTriangles.Push(iT); newTriangles.Push(iNewT1); newTriangles.Push(iNewT2);
@@ -605,19 +605,19 @@ public class Triangulation
         Triangle t1 = triangles[iT1], t2 = triangles[iT2];
         int i = Triangle.OpposedVertexIndex(t1.neighbors, iT2), v1 = t1.vertices[i], v2 = t1.vertices[Triangle.CCW(i)], n1 = t1.neighbors[i], n4 = t1.neighbors[Triangle.CW(i)];
         i = Triangle.OpposedVertexIndex(t2.neighbors, iT1); int v3 = t2.vertices[i], v4 = t2.vertices[Triangle.CCW(i)], n3 = t2.neighbors[i], n2 = t2.neighbors[Triangle.CW(i)];
-        triangles[iT1] = new() { vertices = new(v, v1, v2), neighbors = new(iTnew1, n1, iT2) };
-        triangles[iT2] = new() { vertices = new(v, v2, v3), neighbors = new(iT1, n2, iTnew2) };
-        triangles[iTnew1] = new() { vertices = new(v, v4, v1), neighbors = new(iTnew2, n4, iT1) };
-        triangles[iTnew2] = new() { vertices = new(v, v3, v4), neighbors = new(iT2, n3, iTnew1) };
+        triangles[iT1] = new() { vertices = new[] { v, v1, v2 }, neighbors = new[] { iTnew1, n1, iT2 } };
+        triangles[iT2] = new() { vertices = new[] { v, v2, v3 }, neighbors = new[] { iT1, n2, iTnew2 } };
+        triangles[iTnew1] = new() { vertices = new[] { v, v4, v1 }, neighbors = new[] { iTnew2, n4, iT1 } };
+        triangles[iTnew2] = new() { vertices = new[] { v, v3, v4 }, neighbors = new[] { iT2, n3, iTnew1 } };
         SetAdjancentTriangle(v, iT1); SetAdjancentTriangle(v4, iTnew1);
         ChangeNeighbor(n4, iT1, iTnew1); ChangeNeighbor(n3, iT2, iTnew2);
         Stack<int> newTriangles = new();
         newTriangles.Push(iT1); newTriangles.Push(iTnew2);
         newTriangles.Push(iT2); newTriangles.Push(iTnew1); return newTriangles;
     }
-    FixedArray2<int> TrianglesAt(Vector2 pos)
+    int[] TrianglesAt(Vector2 pos)
     {
-        FixedArray2<int> out_ = new(noNeighbor, noNeighbor);
+        int[] out_ = new int[] { noNeighbor, noNeighbor };
         for (int i = 0; i < triangles.Count; i++)
         {
             Triangle t = triangles[i]; Vector2 v1 = vertices[t.vertices[0]], v2 = vertices[t.vertices[1]], v3 = vertices[t.vertices[2]];
@@ -647,9 +647,9 @@ public class Triangulation
         }
         return currTri;
     }
-    FixedArray2<int> WalkingSearchTriangleAt(Vector2 pos, int startVertex)
+    int[] WalkingSearchTriangleAt(Vector2 pos, int startVertex)
     {
-        FixedArray2<int> out_ = new(noNeighbor, noNeighbor);
+        int[] out_ = new int[] { noNeighbor, noNeighbor };
         int iT = WalkTriangles(startVertex, pos);
         Triangle t = triangles[iT];
         Vector2 v1 = vertices[t.vertices[0]], v2 = vertices[t.vertices[1]], v3 = vertices[t.vertices[2]];
@@ -832,7 +832,7 @@ public class Triangulation
         }
         triangles[iParent].neighbors[iInParent] = iT;
         triangles[iT].neighbors[0] = iParent;
-        triangles[iT].vertices = new(a, b, c);
+        triangles[iT].vertices = new[] { a, b, c };
         SetAdjancentTriangle(a, iT); SetAdjancentTriangle(c, iT);
     }
     int FindDelaunayPoint(List<int> poly, int iA, int iB)
@@ -858,7 +858,7 @@ public class Triangulation
     {
         if (m_dummyTris.Count == 0)
         {
-            Triangle dummy = new() { vertices = new(noNeighbor, noNeighbor, noNeighbor), neighbors = new(noNeighbor, noNeighbor, noNeighbor) };
+            Triangle dummy = new() { vertices = new[] { noNeighbor, noNeighbor, noNeighbor }, neighbors = new[] { noNeighbor, noNeighbor, noNeighbor } };
             triangles.Add(dummy); return triangles.Count - 1;
         }
         int nxtDummy = m_dummyTris[^1]; m_dummyTris.RemoveAt(m_dummyTris.Count - 1); return nxtDummy;

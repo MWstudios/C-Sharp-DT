@@ -438,7 +438,7 @@ public class Triangle
         return D.mostSignificant();
     }
     //public static double Orient2D(double ax, double ay, double bx, double by, double cx, double cy) => (ax - bx) * (by - cy) + (ay - by) * (cx - bx);
-    public FixedArray3<int> vertices = new(), neighbors = new();
+    public int[] vertices = new int[3], neighbors = new int[3];
     public (int, int) Next(int i)
     {
         Debug.Assert(vertices[0] == i || vertices[1] == i || vertices[2] == i);
@@ -475,12 +475,12 @@ public class Triangle
     }
     public static int OppositeNeghbor(int vertIndex) => vertIndex >= 0 && vertIndex < 3 ? (vertIndex + 1) % 3 : throw new ArgumentOutOfRangeException("Invalid vertex index");
     public static int OppositeVertex(int neighborIndex) => neighborIndex >= 0 && neighborIndex < 3 ? (neighborIndex + 2) % 3 : throw new ArgumentOutOfRangeException("Invalid neighbor index");
-    public static int OpposedTriangleIndex(FixedArray3<int> vv, int index)
+    public static int OpposedTriangleIndex(int[] vv, int index)
     {
         Debug.Assert(vv[0] == index || vv[1] == index || vv[2] == index);
         return vv[0] == index ? 1 : vv[1] == index ? 2 : 0;
     }
-    public static int EdgeNeighborIndex(FixedArray3<int> vv, int iVedge1, int iVedge2)
+    public static int EdgeNeighborIndex(int[] vv, int iVedge1, int iVedge2)
     {
         Debug.Assert(vv[0] == iVedge1 || vv[1] == iVedge1 || vv[2] == iVedge1);
         Debug.Assert(vv[0] == iVedge2 || vv[1] == iVedge2 || vv[2] == iVedge2);
@@ -489,12 +489,12 @@ public class Triangle
         if (vv[0] == iVedge2) return vv[1] == iVedge1 ? 0 : 2;
         return 1;
     }
-    public static int OpposedVertexIndex(FixedArray3<int> nn, int iTopo)
+    public static int OpposedVertexIndex(int[] nn, int iTopo)
     {
         Debug.Assert(nn[0] == iTopo || nn[1] == iTopo || nn[2] == iTopo);
         return nn[0] == iTopo ? 2 : nn[1] == iTopo ? 0 : 1;
     }
-    public static int VertexIndex(FixedArray3<int> vv, int iV)
+    public static int VertexIndex(int[] vv, int iV)
     {
         Debug.Assert(vv[0] == iV || vv[1] == iV || vv[2] == iV);
         return vv[0] == iV ? 0 : vv[1] == iV ? 1 : 2;
