@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Copyright (c) 2017 Kastellanos Nikolaos
+
+using System;
 
 namespace CDT;
 
