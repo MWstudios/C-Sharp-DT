@@ -12,13 +12,13 @@ public class CDT
     public Dictionary<Edge, ushort> overlapCount = new(); public Dictionary<Edge, List<Edge>> pieceToOriginals = new();
     public CDT() { }
     /// <param name="vertexInsertionOrder">strategy used for ordering vertex insertions</param>
-    public CDT(VertexInsertionOrder vertexInsertionOrder) { m_vertexInsertionOrder = vertexInsertionOrder; }
+    public CDT(VertexInsertionOrder vertexInsertionOrder) { this.vertexInsertionOrder = vertexInsertionOrder; }
     /// <param name="vertexInsertionOrder">strategy used for ordering vertex insertions</param>
     /// <param name="intersectingEdgesStrategy">strategy for treating intersecting constraint edges</param>
     /// <param name="minDistToConstraintEdge">distance within which point is considered to be lying on a constraint edge. Used when adding constraints to the triangulation.</param>
     public CDT(VertexInsertionOrder vertexInsertionOrder, IntersectingConstraintEdges intersectingEdgesStrategy, double minDistToConstraintEdge)
     {
-        m_vertexInsertionOrder = vertexInsertionOrder; m_intersectingEdgesStrategy = intersectingEdgesStrategy; m_minDistToConstraintEdge = minDistToConstraintEdge;
+        this.vertexInsertionOrder = vertexInsertionOrder; this.intersectingEdgesStrategy = intersectingEdgesStrategy; this.minDistToConstraintEdge = minDistToConstraintEdge;
     }
     /// <param name="vertexInsertionOrder">strategy used for ordering vertex insertions</param>
     /// <param name="nearPtLocator">class providing locating near point for efficiently inserting new points</param>
@@ -26,8 +26,8 @@ public class CDT
     /// <param name="minDistToConstraintEdge">distance within which point is considered to be lying on a constraint edge. Used when adding constraints to the triangulation.</param>
     public CDT(VertexInsertionOrder vertexInsertionOrder, KDTree nearPtLocator, IntersectingConstraintEdges intersectingEdgesStrategy, double minDistToConstraintEdge)
     {
-        m_vertexInsertionOrder = vertexInsertionOrder; m_nearPtLocator = nearPtLocator;
-        m_intersectingEdgesStrategy = intersectingEdgesStrategy; m_minDistToConstraintEdge = minDistToConstraintEdge;
+        this.vertexInsertionOrder = vertexInsertionOrder; this.nearPtLocator = nearPtLocator;
+        this.intersectingEdgesStrategy = intersectingEdgesStrategy; this.minDistToConstraintEdge = minDistToConstraintEdge;
     }
     public record struct DuplicatesInfo(List<int> mapping, List<int> duplicates);
     public static DuplicatesInfo FindDuplicates(ICollection<Vector2> vertices)
@@ -90,9 +90,9 @@ public class CDT
         TryInitNearestPointLocator();
         int nExistingVerts = this.vertices.Count, nVerts = nExistingVerts + vertices.Length;
         triangles.EnsureCapacity(triangles.Count + 2 * nVerts);
-        this.vertices.EnsureCapacity(nVerts); m_vertTris.EnsureCapacity(nVerts);
+        this.vertices.EnsureCapacity(nVerts); vertTris.EnsureCapacity(nVerts);
         foreach (var it in vertices) AddNewVertex(it, noNeighbor);
-        switch (m_vertexInsertionOrder)
+        switch (vertexInsertionOrder)
         {
             case VertexInsertionOrder.AsProvided: InsertVertices_AsProvided(nExistingVerts); break;
             case VertexInsertionOrder.Auto:
@@ -111,9 +111,9 @@ public class CDT
         TryInitNearestPointLocator();
         int nExistingVerts = this.vertices.Count, nVerts = nExistingVerts + vertices.Count;
         triangles.EnsureCapacity(triangles.Count + 2 * nVerts);
-        this.vertices.EnsureCapacity(nVerts); m_vertTris.EnsureCapacity(nVerts);
+        this.vertices.EnsureCapacity(nVerts); vertTris.EnsureCapacity(nVerts);
         foreach (var it in vertices) AddNewVertex(it, noNeighbor);
-        switch (m_vertexInsertionOrder)
+        switch (vertexInsertionOrder)
         {
             case VertexInsertionOrder.AsProvided: InsertVertices_AsProvided(nExistingVerts); break;
             case VertexInsertionOrder.Auto:
@@ -128,7 +128,7 @@ public class CDT
         if (IsFinalized()) throw new ArgumentException("Triangulation was finalized with 'erase...' method. Inserting new edges is not possible");
         for (int i = 0; i < edges.Length; i++)
         {
-            Edge edge = new(edges[i].iV1 + m_nTargetVerts, edges[i].iV2 + m_nTargetVerts);
+            Edge edge = new(edges[i].iV1 + nTargetVerts, edges[i].iV2 + nTargetVerts);
             InsertEdge(edge, edge, remaining, tppIterations);
         }
         EraseDummies();
@@ -139,7 +139,7 @@ public class CDT
         if (IsFinalized()) throw new ArgumentException("Triangulation was finalized with 'erase...' method. Inserting new edges is not possible");
         foreach (var i in edges)
         {
-            Edge edge = new(i.iV1 + m_nTargetVerts, i.iV2 + m_nTargetVerts);
+            Edge edge = new(i.iV1 + nTargetVerts, i.iV2 + nTargetVerts);
             InsertEdge(edge, edge, remaining, tppIterations);
         }
         EraseDummies();
@@ -151,7 +151,7 @@ public class CDT
         TryInitNearestPointLocator();
         for (int i = 0; i < edges.Length; i++)
         {
-            Edge edge = new(edges[i].iV1 + m_nTargetVerts, edges[i].iV2 + m_nTargetVerts);
+            Edge edge = new(edges[i].iV1 + nTargetVerts, edges[i].iV2 + nTargetVerts);
             ConformToEdge(edge, new() { edge }, 0, remaining);
         }
     }
@@ -170,7 +170,7 @@ public class CDT
         if (IsFinalized()) throw new ArgumentException("Triangulation was finalized with 'erase...' method. Conforming to new edges is not possible");
         foreach (var i in edges)
         {
-            Edge edge = new(i.iV1 + m_nTargetVerts, i.iV2 + m_nTargetVerts);
+            Edge edge = new(i.iV1 + nTargetVerts, i.iV2 + nTargetVerts);
             ConformToEdge(edge, new() { edge }, 0, remaining);
         }
     }
@@ -178,7 +178,7 @@ public class CDT
     /// <remarks>does nothing if custom geometry is used</remarks>
     public void EraseSuperTriangle()
     {
-        if (m_superGeomType != SuperGeometryType.SuperTriangle) return;
+        if (superGeomType != SuperGeometryType.SuperTriangle) return;
         HashSet<int> toErase = new(triangles.Count);
         for (int i = 0; i < triangles.Count; i++)
             if (Triangle.TouchesSuperTriangle(triangles[i])) toErase.Add(i);
@@ -187,8 +187,8 @@ public class CDT
     /// <summary>Erase triangles outside of constrained boundary using growing</summary>
     public void EraseOuterTriangles()
     {
-        Debug.Assert(m_vertTris.Count > 0 && m_vertTris[0] != noNeighbor);
-        Stack<int> seed = new(); seed.Push(m_vertTris[0]);
+        Debug.Assert(vertTris.Count > 0 && vertTris[0] != noNeighbor);
+        Stack<int> seed = new(); seed.Push(vertTris[0]);
         HashSet<int> toErase = GrowToBoundary(seed);
         FinalizeTriangulation(toErase);
     }
@@ -204,11 +204,11 @@ public class CDT
     /// <summary>Call this method after directly setting custom super-geometry via vertices and triangles members</summary>
     public void InitializedWithCustomSuperGeometry()
     {
-        m_nearPtLocator = new(vertices); m_nTargetVerts = vertices.Count; m_superGeomType = SuperGeometryType.Custom;
+        nearPtLocator = new(vertices); nTargetVerts = vertices.Count; superGeomType = SuperGeometryType.Custom;
     }
     /// <summary>Check if the triangulation was finalized with `erase...` method and super-triangle was removed.</summary>
     /// <returns>true if triangulation is finalized, false otherwise</returns>
-    public bool IsFinalized() => m_vertTris.Count == 0 && vertices.Count > 0;
+    public bool IsFinalized() => vertTris.Count == 0 && vertices.Count > 0;
     /// <summary>Calculate depth of each triangle in constraint triangulation. Supports
     /// <br/>overlapping boundaries.
     /// <br/>
@@ -224,7 +224,7 @@ public class CDT
     public List<ushort> CalculateTriangleDepths()
     {
         List<ushort> triDepths = new(triangles.Count);
-        Stack<int> seeds = new(); seeds.Push(m_vertTris[0]);
+        Stack<int> seeds = new(); seeds.Push(vertTris[0]);
         ushort layerDepth = 0, deepestSeedDepth = 0;
         Dictionary<ushort, Stack<int>> seedsByDepth = new();
         do
@@ -311,21 +311,21 @@ public class CDT
                 else if (triangles[i].neighbors[n] != noNeighbor) triangles[i].neighbors[n] = triIndMap[triangles[i].neighbors[n]];
     }
     /// <summary>Access internal vertex adjacent triangles</summary>
-    public List<int> VertTrisInternal() => m_vertTris;
+    public List<int> VertTrisInternal() => vertTris;
     void AddSuperTriangle(Box box)
     {
-        m_nTargetVerts = 3; m_superGeomType = SuperGeometryType.SuperTriangle;
+        nTargetVerts = 3; superGeomType = SuperGeometryType.SuperTriangle;
         Vector2 center = (box.min + box.max) / 2;
         double r = Vector2.Distance(box.max, box.min) / 2 * 1.1, R = r * 2, shiftX = R * Math.Sqrt(3) / 2;
         Vector2 posV1 = center - new Vector2(shiftX, r), posV2 = center + new Vector2(shiftX, -r), posV3 = center + new Vector2(0, R);
         AddNewVertex(posV1, 0); AddNewVertex(posV2, 0); AddNewVertex(posV3, 0);
         AddTriangle(new() { vertices = new[] { 0, 1, 2 }, neighbors = new[] { noNeighbor, noNeighbor, noNeighbor } });
-        if (m_vertexInsertionOrder != VertexInsertionOrder.Auto) m_nearPtLocator = new(vertices);
+        if (vertexInsertionOrder != VertexInsertionOrder.Auto) nearPtLocator = new(vertices);
     }
-    void AddNewVertex(Vector2 pos, int iT) { vertices.Add(pos); m_vertTris.Add(iT); }
+    void AddNewVertex(Vector2 pos, int iT) { vertices.Add(pos); vertTris.Add(iT); }
     void InsertVertex(int iVert)
     {
-        Vector2 v = vertices[iVert]; int walkStart = m_nearPtLocator.Nearest(v, vertices).Item2;
+        Vector2 v = vertices[iVert]; int walkStart = nearPtLocator.Nearest(v, vertices).Item2;
         InsertVertex(iVert, walkStart); TryAddVertexToLocator(iVert);
     }
     void InsertVertex(int iVert, int walkStart)
@@ -348,7 +348,7 @@ public class CDT
     }
     List<Edge> InsertVertex_FlipFixedEdges(int iV1)
     {
-        List<Edge> flippedFixedEdges = new(); Vector2 v1 = vertices[iV1]; int startVertex = m_nearPtLocator.Nearest(v1, vertices).Item2;
+        List<Edge> flippedFixedEdges = new(); Vector2 v1 = vertices[iV1]; int startVertex = nearPtLocator.Nearest(v1, vertices).Item2;
         int[] trisAt = WalkingSearchTriangleAt(v1, startVertex);
         Stack<int> triStack = trisAt[1] == noNeighbor ? InsertVertexInsideTriangle(iV1, trisAt[0]) : InsertVertexOnEdge(iV1, trisAt[0], trisAt[1]);
         while (triStack.Count > 0)
@@ -391,7 +391,7 @@ public class CDT
     {
         int iA = edge.iV1, iB = edge.iV2; if (iA == iB) return;
         if (HasEdge(iA, iB)) { FixEdge(edge, originalEdge); return; }
-        Vector2 a = vertices[iA], b = vertices[iB]; double distanceTolerance = m_minDistToConstraintEdge == 0 ? 0 : m_minDistToConstraintEdge * Vector2.Distance(a, b);
+        Vector2 a = vertices[iA], b = vertices[iB]; double distanceTolerance = minDistToConstraintEdge == 0 ? 0 : minDistToConstraintEdge * Vector2.Distance(a, b);
         (int iT, int iVL, int iVR) = IntersectedTriangle(iA, a, b, distanceTolerance);
         if (iT == noNeighbor)
         { Edge edgePart = new(iA, iVL); FixEdge(edgePart, originalEdge); remaining.Add(new(iVL, iB)); return; }
@@ -403,7 +403,7 @@ public class CDT
         {
             int iTopo = Triangle.OpposedTriangle(t, iV); Triangle tOpo = triangles[iTopo];
             int iVopo = Triangle.OpposedVertex(tOpo, iT);
-            if (m_intersectingEdgesStrategy == IntersectingConstraintEdges.Resolve && fixedEdges.Contains(new(iVL, iVR)))
+            if (intersectingEdgesStrategy == IntersectingConstraintEdges.Resolve && fixedEdges.Contains(new(iVL, iVR)))
             {
                 Vector2 newV = IntersectionPosition(vertices[iA], vertices[iB], vertices[iVL], vertices[iVR]);
                 int iNewVert = SplitFixedEdgeAt(new(iVL, iVR), newV, iT, iTopo);
@@ -432,8 +432,8 @@ public class CDT
         outerTrisR.Add(Triangle.EdgeNeighbor(t, polyR[^1], iB));
         polyL.Add(iB); polyR.Add(iB);
         Debug.Assert(intersected.Count > 0);
-        if (m_vertTris[iA] == intersected[0]) PivotVertexTriangleCW(iA);
-        if (m_vertTris[iB] == intersected[^1]) PivotVertexTriangleCW(iB);
+        if (vertTris[iA] == intersected[0]) PivotVertexTriangleCW(iA);
+        if (vertTris[iB] == intersected[^1]) PivotVertexTriangleCW(iB);
         foreach (var i in intersected) MakeDummy(i);
         polyR.Reverse(); outerTrisR.Reverse();
         int iTL = AddTriangle(), iTR = AddTriangle();
@@ -478,7 +478,7 @@ public class CDT
             if (originals.Count > 0 && edge != originals[0]) DictionaryInsertUnique(pieceToOriginals, edge, originals);
             return;
         }
-        Vector2 a = vertices[iA], b = vertices[iB]; double distanceTolerance = m_minDistToConstraintEdge == 0 ? 0 : m_minDistToConstraintEdge * Vector2.Distance(a, b);
+        Vector2 a = vertices[iA], b = vertices[iB]; double distanceTolerance = minDistToConstraintEdge == 0 ? 0 : minDistToConstraintEdge * Vector2.Distance(a, b);
         (int iT, int iVleft, int iVright) = IntersectedTriangle(iA, a, b, distanceTolerance);
         if (iT == noNeighbor)
         {
@@ -493,7 +493,7 @@ public class CDT
         {
             int iTopo = Triangle.OpposedTriangle(t, iV); Triangle tOpo = triangles[iTopo];
             int iVopo = Triangle.OpposedVertex(tOpo, iT); Vector2 vOpo = vertices[iVopo];
-            if (m_intersectingEdgesStrategy == IntersectingConstraintEdges.Resolve && fixedEdges.Contains(new(iVleft, iVright)))
+            if (intersectingEdgesStrategy == IntersectingConstraintEdges.Resolve && fixedEdges.Contains(new(iVleft, iVright)))
             {
                 Vector2 newV = IntersectionPosition(vertices[iA], vertices[iB], vertices[iVleft], vertices[iVright]);
                 int iNewVert = SplitFixedEdgeAt(new(iVleft, iVright), newV, iT, iTopo);
@@ -528,7 +528,7 @@ public class CDT
     }
     (int, int, int) IntersectedTriangle(int iA, Vector2 a, Vector2 b, double orientationTolerance = 0)
     {
-        int startTri = m_vertTris[iA], iT = startTri;
+        int startTri = vertTris[iA], iT = startTri;
         do
         {
             Triangle t = triangles[iT];
@@ -630,7 +630,7 @@ public class CDT
     }
     int WalkTriangles(int startVertex, Vector2 pos)
     {
-        int currTri = m_vertTris[startVertex]; bool found = false;
+        int currTri = vertTris[startVertex]; bool found = false;
         SplitMix64RandGen prng = new();
         while (!found)
         {
@@ -747,7 +747,7 @@ public class CDT
     {
         if (fixedEdges.Contains(new(iV2, iV4))) return false;
         Vector2 v2 = vertices[iV2], v3 = vertices[iV3], v4 = vertices[iV4];
-        if (m_superGeomType == SuperGeometryType.SuperTriangle)
+        if (superGeomType == SuperGeometryType.SuperTriangle)
         {
             // If flip-candidate edge touches super-triangle in-circumference
             // test has to be replaced with orient2d test against the line
@@ -796,11 +796,11 @@ public class CDT
     void TriangulatePseudoPolygon(List<int> poly, List<int> outerTris, int iT, int iN, List<TriangulatePseudoPolygonTask> iterations)
     {
         Debug.Assert(poly.Count > 2);
-        for (int i = 1; i < outerTris.Count; i++) if (outerTris[i] == noNeighbor) m_vertTris[poly[i]] = noNeighbor;
+        for (int i = 1; i < outerTris.Count; i++) if (outerTris[i] == noNeighbor) vertTris[poly[i]] = noNeighbor;
         iterations.Clear();
         iterations.Add(new(0, poly.Count - 1, iT, iN, 0));
         while (iterations.Count > 0) TriangulatePseudoPolygonIteration(poly, outerTris, iterations);
-        for (int i = 0; i < poly.Count; i++) Debug.Assert(m_vertTris[poly[i]] != noNeighbor);
+        for (int i = 0; i < poly.Count; i++) Debug.Assert(vertTris[poly[i]] != noNeighbor);
     }
     void TriangulatePseudoPolygonIteration(List<int> poly, List<int> outerTris, List<TriangulatePseudoPolygonTask> iterations)
     {
@@ -822,7 +822,7 @@ public class CDT
         if (iC - iA > 1) { int iNext = AddTriangle(); iterations.Add(new(iA, iC, iNext, iT, 2)); }
         else
         {
-            int outerTri = outerTris[iA] != noNeighbor ? outerTris[iA] : m_vertTris[c];
+            int outerTri = outerTris[iA] != noNeighbor ? outerTris[iA] : vertTris[c];
             if (outerTri != noNeighbor)
             {
                 Debug.Assert(outerTri != iT);
@@ -850,25 +850,25 @@ public class CDT
     }
     int AddTriangle(Triangle t)
     {
-        if (m_dummyTris.Count == 0) { triangles.Add(t); return triangles.Count - 1; }
-        int nxtDummy = m_dummyTris[^1];
-        m_dummyTris.RemoveAt(m_dummyTris.Count - 1); triangles[nxtDummy] = t; return nxtDummy;
+        if (dummyTris.Count == 0) { triangles.Add(t); return triangles.Count - 1; }
+        int nxtDummy = dummyTris[^1];
+        dummyTris.RemoveAt(dummyTris.Count - 1); triangles[nxtDummy] = t; return nxtDummy;
     }
     int AddTriangle()
     {
-        if (m_dummyTris.Count == 0)
+        if (dummyTris.Count == 0)
         {
             Triangle dummy = new() { vertices = new[] { noNeighbor, noNeighbor, noNeighbor }, neighbors = new[] { noNeighbor, noNeighbor, noNeighbor } };
             triangles.Add(dummy); return triangles.Count - 1;
         }
-        int nxtDummy = m_dummyTris[^1]; m_dummyTris.RemoveAt(m_dummyTris.Count - 1); return nxtDummy;
+        int nxtDummy = dummyTris[^1]; dummyTris.RemoveAt(dummyTris.Count - 1); return nxtDummy;
     }
     /// <summary>Remove super-triangle (if used) and triangles with specified indices. Adjust internal triangulation state accordingly.</summary>
     /// <param name="removedTriangles">indices of triangles to remove</param>
     void FinalizeTriangulation(HashSet<int> removedTriangles)
     {
-        EraseDummies(); m_vertTris.Clear();
-        if (m_superGeomType == SuperGeometryType.SuperTriangle)
+        EraseDummies(); vertTris.Clear();
+        if (superGeomType == SuperGeometryType.SuperTriangle)
         {
             vertices.RemoveRange(0, 3);
             fixedEdges = fixedEdges.Select(x => RemapNoSuperTriangle(x)).ToHashSet();
@@ -877,7 +877,7 @@ public class CDT
             (RemapNoSuperTriangle(x.Key), x.Value.Select(x => RemapNoSuperTriangle(x)).ToList())).ToDictionary(x => x.Item1, x => x.Item2);
         }
         RemoveTriangles(removedTriangles);
-        if (m_superGeomType == SuperGeometryType.SuperTriangle)
+        if (superGeomType == SuperGeometryType.SuperTriangle)
             for (int t = 0; t < triangles.Count; t++) for (int i = 0; i < 3; i++) triangles[t].vertices[i] -= 3;
     }
     HashSet<int> GrowToBoundary(Stack<int> seeds)
@@ -956,13 +956,13 @@ public class CDT
     /// <summary>Flag triangle as dummy</summary>
     /// <param name="iT">index of a triangle to flag</param>
     /// <remarks>Advanced method for manually modifying the triangulation from outside. Please call it when you know what you are doing.</remarks>
-    void MakeDummy(int iT) => m_dummyTris.Add(iT);
+    void MakeDummy(int iT) => dummyTris.Add(iT);
     /// <summary>Erase all dummy triangles</summary>
     /// <remarks>Advanced method for manually modifying the triangulation from outside. Please call it when you know what you are doing.</remarks>
     void EraseDummies()
     {
-        if (m_dummyTris.Count == 0) return;
-        HashSet<int> dummySet = new(m_dummyTris);
+        if (dummyTris.Count == 0) return;
+        HashSet<int> dummySet = new(dummyTris);
         Dictionary<int, int> triIndMap = new() { [noNeighbor] = noNeighbor };
         for (int i = 0, itNew = 0; i < triangles.Count; i++)
         {
@@ -972,10 +972,10 @@ public class CDT
             itNew++;
         }
         triangles.RemoveRange(dummySet.Count, triangles.Count - dummySet.Count);
-        for (int i = 0; i < m_vertTris.Count; i++) m_vertTris[i] = triIndMap[m_vertTris[i]];
+        for (int i = 0; i < vertTris.Count; i++) vertTris[i] = triIndMap[vertTris[i]];
         for (int t = 0; t < triangles.Count; t++) for (int i = 0; i < 3; i++)
                 triangles[t].neighbors[i] = triIndMap[triangles[t].neighbors[i]];
-        m_dummyTris.Clear();
+        dummyTris.Clear();
     }
     /// <summary>Depth-peel a layer in triangulation, used when calculating triangle
     /// depths<br/>
@@ -1074,7 +1074,7 @@ public class CDT
     }
     (int, int) EdgeTriangles(int a, int b)
     {
-        int triStart = m_vertTris[a];
+        int triStart = vertTris[a];
         Debug.Assert(triStart != noNeighbor);
         int iT = triStart, iTNext, iV;
         do
@@ -1089,24 +1089,24 @@ public class CDT
     bool HasEdge(int a, int b) => EdgeTriangles(a, b).Item1 != invalidIndex;
     void SetAdjancentTriangle(int v, int t)
     {
-        Debug.Assert(t != noNeighbor); m_vertTris[v] = t;
+        Debug.Assert(t != noNeighbor); vertTris[v] = t;
         Debug.Assert(triangles[t].vertices[0] == v || triangles[t].vertices[1] == v || triangles[t].vertices[2] == v);
     }
     void PivotVertexTriangleCW(int v)
     {
-        Debug.Assert(m_vertTris[v] != noNeighbor);
-        m_vertTris[v] = triangles[m_vertTris[v]].Next(v).Item1;
-        Debug.Assert(m_vertTris[v] != noNeighbor);
-        Debug.Assert(triangles[m_vertTris[v]].vertices[0] == v || triangles[m_vertTris[v]].vertices[1] == v || triangles[m_vertTris[v]].vertices[2] == v);
+        Debug.Assert(vertTris[v] != noNeighbor);
+        vertTris[v] = triangles[vertTris[v]].Next(v).Item1;
+        Debug.Assert(vertTris[v] != noNeighbor);
+        Debug.Assert(triangles[vertTris[v]].vertices[0] == v || triangles[vertTris[v]].vertices[1] == v || triangles[vertTris[v]].vertices[2] == v);
     }
-    void TryAddVertexToLocator(int v) { if (m_nearPtLocator.Size == 0) m_nearPtLocator.Insert(v, vertices); }
-    void TryInitNearestPointLocator() { if (vertices.Count == 0 && m_nearPtLocator.Size == 0) m_nearPtLocator = new(vertices); }
-    List<int> m_dummyTris = new();
-    KDTree m_nearPtLocator = new();
-    int m_nTargetVerts;
-    SuperGeometryType m_superGeomType;
-    VertexInsertionOrder m_vertexInsertionOrder;
-    IntersectingConstraintEdges m_intersectingEdgesStrategy;
-    double m_minDistToConstraintEdge;
-    List<int> m_vertTris = new();
+    void TryAddVertexToLocator(int v) { if (nearPtLocator.Size == 0) nearPtLocator.Insert(v, vertices); }
+    void TryInitNearestPointLocator() { if (vertices.Count == 0 && nearPtLocator.Size == 0) nearPtLocator = new(vertices); }
+    List<int> dummyTris = new();
+    KDTree nearPtLocator = new();
+    int nTargetVerts;
+    public SuperGeometryType superGeomType;
+    VertexInsertionOrder vertexInsertionOrder;
+    IntersectingConstraintEdges intersectingEdgesStrategy;
+    double minDistToConstraintEdge;
+    List<int> vertTris = new();
 }
