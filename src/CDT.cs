@@ -174,6 +174,56 @@ public class CDT
             ConformToEdge(edge, new() { edge }, 0, remaining);
         }
     }
+    public void RefineTriangles(int maxVerticesToInsert, RefinementCriterion refinementCriterion = RefinementCriterion.SmallestAngle, double refinementThreshold = 20 / 180.0 * Math.PI)
+    {
+        if (IsFinalized()) throw new ArgumentException("Triangulation was finalized with 'erase...' method. Refinement is not possible");
+        TryInitNearestPointLocator();
+        int remainingVertexBudget = maxVerticesToInsert,
+            steinerVerticesOffset = vertices.Count;
+        Queue<Edge> encroachedEdges = FindEncroachedFixedEdges();
+        for (; encroachedEdges.Count > 0 && remainingVertexBudget > 0; --remainingVertexBudget)
+        {
+            Edge edge = encroachedEdges.Dequeue();
+            int iSplitVert = SplitEncroachedEdge(edge, steinerVerticesOffset);
+            Edge half1 = new(edge.iV1, iSplitVert);
+            if (IsEdgeEncroached(half1)) encroachedEdges.Enqueue(half1);
+            Edge half2 = new(iSplitVert, edge.iV2);
+            if (IsEdgeEncroached(half2)) encroachedEdges.Enqueue(half2);
+        }
+        if (remainingVertexBudget == 0) return;
+        Queue<int> badTriangles = new();
+        for (int iT = 0; iT < triangles.Count; iT++)
+        {
+            Triangle t = triangles[iT];
+            if (!Triangle.TouchesSuperTriangle(t) && IsRefinementNeeded(t, refinementCriterion, refinementThreshold)) badTriangles.Enqueue(iT);
+        }
+        while (badTriangles.Count > 0 && remainingVertexBudget > 0)
+        {
+            int iT = badTriangles.Dequeue();
+            Triangle badT = triangles[iT];
+            if (!IsRefinementNeeded(badT, refinementCriterion, refinementThreshold)) continue;
+            Vector2 triCircumcenter = Triangle.Circumcenter(vertices[badT.vertices[0]], vertices[badT.vertices[1]], vertices[badT.vertices[2]]);
+            if (Triangle.LocatePointTriangle(triCircumcenter, vertices[0], vertices[1], vertices[2]) == PtTriLocation.Outside) continue;
+            List<int> badTris = ResolveEncroachedEdges(EdgesEncroachedBy(triCircumcenter), ref remainingVertexBudget, steinerVerticesOffset, triCircumcenter, refinementCriterion, refinementThreshold);
+            if (remainingVertexBudget == 0) break;
+            if (badTris.Count > 0)
+            {
+                for (int it = 0; it < badTris.Count; it++) badTriangles.Enqueue(badTris[it]);
+                badTriangles.Enqueue(iT); continue;
+            }
+            --remainingVertexBudget;
+            int iVert = vertices.Count;
+            AddNewVertex(triCircumcenter, noNeighbor);
+            InsertVertex(iVert);
+            int start = vertTris[iVert], currTri = start;
+            do
+            {
+                Triangle t = triangles[currTri];
+                if (IsRefinementNeeded(t, refinementCriterion, refinementThreshold)) badTriangles.Enqueue(currTri);
+                currTri = t.Next(iVert).Item1;
+            } while (currTri != start);
+        }
+    }
     /// <summary>Erase triangles adjacent to super triangle</summary>
     /// <remarks>does nothing if custom geometry is used</remarks>
     public void EraseSuperTriangle()
@@ -379,9 +429,9 @@ public class CDT
             InsertEdgeIteration(edge, originalEdge, remaining, tppIterations);
         }
     }
+    static double Lerp(double a, double b, double t) => (1 - t) * a + t * b;
     static Vector2 IntersectionPosition(Vector2 a, Vector2 b, Vector2 c, Vector2 d)
     {
-        static double Lerp(double a, double b, double t) => (1 - t) * a + t * b;
         double a_cd = Triangle.Orient2D(c.X, c.Y, d.X, d.Y, a.X, a.Y), b_cd = Triangle.Orient2D(c.X, c.Y, d.X, d.Y, b.X, b.Y), t_ab = a_cd / (a_cd - b_cd),
             c_ab = Triangle.Orient2D(a.X, a.Y, b.X, b.Y, c.X, c.Y), d_ab = Triangle.Orient2D(a.X, a.Y, b.X, b.Y, d.X, d.Y), t_cd = c_ab / (c_ab - d_ab);
         return new(Math.Abs(a.X - b.X) < Math.Abs(c.X - d.X) ? Lerp(a.X, b.X, t_ab) : Lerp(c.X, d.X, t_cd),
@@ -780,6 +830,92 @@ public class CDT
                 return Triangle.LocatePointLine(v4, v2, v3) == Triangle.LocatePointLine(v, v2, v3);
         }
         return Triangle.IsInCircumcircle(v, v2, v3, v4);
+    }
+    bool IsRefinementNeeded(Triangle tri, RefinementCriterion refinementCriterion, double refinementThreshold)
+    {
+        Vector2 a = vertices[tri.vertices[0]], b = vertices[tri.vertices[1]], c = vertices[tri.vertices[2]];
+        switch (refinementCriterion)
+        {
+            case RefinementCriterion.SmallestAngle:
+                return Triangle.SmallestAngle(a, b, c) <= refinementThreshold;
+            case RefinementCriterion.LargestArea:
+                return Triangle.Area(a, b, c) >= refinementThreshold;
+            default: return false;
+        }
+    }
+    bool IsEdgeEncroached(Edge edge)
+    {
+        (int iT, int iTopo) = EdgeTriangles(edge.iV1, edge.iV2);
+        Debug.Assert(iT != invalidIndex && iTopo != invalidIndex);
+        int v1 = Triangle.OpposedVertex(triangles[iT], iTopo),
+            v2 = Triangle.OpposedVertex(triangles[iTopo], iT);
+        Vector2 edgeStart = vertices[edge.iV1], edgeEnd = vertices[edge.iV2];
+        return Triangle.IsEncroachingOnEdge(vertices[v1], edgeStart, edgeEnd) || Triangle.IsEncroachingOnEdge(vertices[v2], edgeStart, edgeEnd);
+    }
+    bool IsEdgeEncroachedBy(Edge edge, Vector2 v) => Triangle.IsEncroachingOnEdge(v, vertices[edge.iV1], vertices[edge.iV2]);
+    Queue<Edge> FindEncroachedFixedEdges()
+    {
+        Queue<Edge> encroachedEdges = new();
+        foreach (var edge in fixedEdges)
+        {
+            if (IsEdgeEncroached(edge)) encroachedEdges.Enqueue(edge);
+        }
+        return encroachedEdges;
+    }
+    Queue<Edge> EdgesEncroachedBy(Vector2 v)
+    {
+        Queue<Edge> encroachedEdges = new();
+        foreach (var it in fixedEdges)
+        {
+            if (IsEdgeEncroachedBy(it, v)) encroachedEdges.Enqueue(it);
+        }
+        return encroachedEdges;
+    }
+    List<int> ResolveEncroachedEdges(Queue<Edge> encroachedEdges, ref int remainingVertexBudget, int steinerVerticesOffset, Vector2? circumcenterOrNull, RefinementCriterion refinementCriterion, double badTriangleThreshold)
+    {
+        List<int> badTriangles = new();
+        while (encroachedEdges.Count > 0 && remainingVertexBudget > 0)
+        {
+            Edge edge = encroachedEdges.Dequeue();
+            if (!fixedEdges.Contains(edge)) continue;
+            int iSplitVert = SplitEncroachedEdge(edge, steinerVerticesOffset);
+            --remainingVertexBudget;
+            int start = vertTris[iSplitVert];
+            int iT = start;
+            do
+            {
+                Triangle t = triangles[iT];
+                if (circumcenterOrNull != null && IsRefinementNeeded(t, refinementCriterion, badTriangleThreshold)) badTriangles.Add(iT);
+                for (int i = 0; i < 3; i++)
+                {
+                    Edge triEdge = new(t.vertices[i], t.vertices[Triangle.CW(i)]);
+                    if (!fixedEdges.Contains(triEdge)) continue;
+                    if (IsEdgeEncroached(triEdge) || (circumcenterOrNull is Vector2 v && IsEdgeEncroachedBy(triEdge, v))) encroachedEdges.Enqueue(triEdge);
+                }
+                iT = t.Next(iSplitVert).Item1;
+            } while (iT != start);
+        }
+        return badTriangles;
+    }
+    int SplitEncroachedEdge(Edge edge, int steinerVerticesOffset)
+    {
+        Vector2 start = vertices[edge.iV1], end = vertices[edge.iV2]; double split = 0.5;
+        if (edge.iV1 >= steinerVerticesOffset || edge.iV2 >= steinerVerticesOffset)
+        {
+            double len = Vector2.Distance(start, end);
+            double d = len / 2, nearestPowerOfTwo = 1;
+            while (d > nearestPowerOfTwo) nearestPowerOfTwo *= 2;
+            while (d < 0.75 * nearestPowerOfTwo) nearestPowerOfTwo *= 0.5;
+            Debug.Assert(Math.Abs(nearestPowerOfTwo - Math.Pow(2, Math.Round(Math.Log2(d)))) < 1e6);
+            split = nearestPowerOfTwo / len;
+            if (edge.iV1 >= steinerVerticesOffset) split = 1 - split;
+        }
+        Vector2 mid = new(Lerp(start.X, end.X, split), Lerp(start.Y, end.Y, split));
+        (int iT, int iTopo) = EdgeTriangles(edge.iV1, edge.iV2);
+        Debug.Assert(iT != invalidIndex && iTopo != invalidIndex);
+        int iMid = AddSplitEdgeVertex(mid, iT, iTopo);
+        if (!fixedEdges.Contains(edge)) SplitFixedEdge(edge, iMid);
+        return iMid;
     }
     void ChangeNeighbor(int iT, int oldNeighbor, int newNeighbor)
     {

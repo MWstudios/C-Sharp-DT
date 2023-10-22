@@ -10,6 +10,7 @@ public enum SuperGeometryType { SuperTriangle, Custom }
 public enum IntersectingConstraintEdges { Ignore, Resolve }
 public enum PtTriLocation { Inside, Outside, OnEdge1, OnEdge2, OnEdge3 }
 public enum PtLineLocation { Left, Right, OnLine }
+public enum RefinementCriterion { SmallestAngle, LargestArea }
 public struct Box
 {
     public Vector2 min, max;
@@ -584,6 +585,32 @@ public class Triangle
         return false;
     }
     public static bool TouchesSuperTriangle(Triangle t) => t.vertices[0] < 3 || t.vertices[1] < 3 || t.vertices[2] < 3;
+    public static bool IsEncroachingOnEdge(Vector2 v, Vector2 edgeStart, Vector2 edgeEnd) => (edgeStart.X - v.X) * (edgeEnd.X - v.X) + (edgeStart.Y - v.Y) * (edgeEnd.Y - v.Y) <= 0;
+    public static Vector2 Circumcenter(Vector2 a, Vector2 b, Vector2 c)
+    {
+        double denom = 2 * Orient2D(a, b, c);
+        Debug.Assert(denom != 0);
+        a -= c; b -= c;
+        double aLenSq = a.LengthSquared(), bLenSq = b.LengthSquared();
+        c.X += (b.Y * aLenSq - a.Y * bLenSq) / denom;
+        c.Y += (a.X * bLenSq - b.X * aLenSq) / denom;
+        return c;
+    }
+    public static double DoubledArea(Vector2 a, Vector2 b, Vector2 c) => Math.Abs(Orient2D(a, b, c));
+    public static double Area(Vector2 a, Vector2 b, Vector2 c) => DoubledArea(a, b, c) / 2;
+    public static double SineOfSmallestAngle(Vector2 a, Vector2 b, Vector2 c)
+    {
+        double sideA = Vector2.Distance(a, b), sideB = Vector2.Distance(b, c);
+        if (sideA > sideB) (sideA, sideB) = (sideB, sideA);
+        sideA = Math.Max(sideA, Vector2.Distance(a, c));
+        return (DoubledArea(a, b, c) / sideA) / sideB;
+    }
+    public static double SmallestAngle(Vector2 a, Vector2 b, Vector2 c)
+    {
+        double angleSine = SineOfSmallestAngle(a, b, c);
+        Debug.Assert(angleSine >= -1 && angleSine <= 1);
+        return Math.Asin(angleSine);
+    }
 }
 struct SplitMix64RandGen
 {
