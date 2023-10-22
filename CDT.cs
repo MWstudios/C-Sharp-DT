@@ -4,19 +4,19 @@ using System.Diagnostics;
 using System.Collections.Generic;
 
 namespace CDT;
-public class Triangulation
+public class CDT
 {
     const int noNeighbor = int.MaxValue;
     const int invalidIndex = int.MaxValue;
     public List<Vector2> vertices = new(); public List<Triangle> triangles = new(); public HashSet<Edge> fixedEdges = new();
     public Dictionary<Edge, ushort> overlapCount = new(); public Dictionary<Edge, List<Edge>> pieceToOriginals = new();
-    public Triangulation() { }
+    public CDT() { }
     /// <param name="vertexInsertionOrder">strategy used for ordering vertex insertions</param>
-    public Triangulation(VertexInsertionOrder vertexInsertionOrder) { m_vertexInsertionOrder = vertexInsertionOrder; }
+    public CDT(VertexInsertionOrder vertexInsertionOrder) { m_vertexInsertionOrder = vertexInsertionOrder; }
     /// <param name="vertexInsertionOrder">strategy used for ordering vertex insertions</param>
     /// <param name="intersectingEdgesStrategy">strategy for treating intersecting constraint edges</param>
     /// <param name="minDistToConstraintEdge">distance within which point is considered to be lying on a constraint edge. Used when adding constraints to the triangulation.</param>
-    public Triangulation(VertexInsertionOrder vertexInsertionOrder, IntersectingConstraintEdges intersectingEdgesStrategy, double minDistToConstraintEdge)
+    public CDT(VertexInsertionOrder vertexInsertionOrder, IntersectingConstraintEdges intersectingEdgesStrategy, double minDistToConstraintEdge)
     {
         m_vertexInsertionOrder = vertexInsertionOrder; m_intersectingEdgesStrategy = intersectingEdgesStrategy; m_minDistToConstraintEdge = minDistToConstraintEdge;
     }
@@ -24,7 +24,7 @@ public class Triangulation
     /// <param name="nearPtLocator">class providing locating near point for efficiently inserting new points</param>
     /// <param name="intersectingEdgesStrategy">strategy for treating intersecting constraint edges</param>
     /// <param name="minDistToConstraintEdge">distance within which point is considered to be lying on a constraint edge. Used when adding constraints to the triangulation.</param>
-    public Triangulation(VertexInsertionOrder vertexInsertionOrder, KDTree nearPtLocator, IntersectingConstraintEdges intersectingEdgesStrategy, double minDistToConstraintEdge)
+    public CDT(VertexInsertionOrder vertexInsertionOrder, KDTree nearPtLocator, IntersectingConstraintEdges intersectingEdgesStrategy, double minDistToConstraintEdge)
     {
         m_vertexInsertionOrder = vertexInsertionOrder; m_nearPtLocator = nearPtLocator;
         m_intersectingEdgesStrategy = intersectingEdgesStrategy; m_minDistToConstraintEdge = minDistToConstraintEdge;
