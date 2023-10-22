@@ -5,7 +5,7 @@ There are a few notable problems, such as CDT crashing and asserting at thin tri
 
 ## Adding to your project
 
-The code is fairly small. You can simply drag and drop these 4 .cs files in your project. These should be able to get compiled starting with .NET 5.
+The code is fairly small. You can simply drag and drop all .cs files from the src folder in your project. These should be able to get compiled starting with .NET 5.
 
 If you have your own implementation of Vector2 that is 64-bit and supports element-wise arithmetic, `Vector2.Distance()`, `Vector2.DistanceSquared()`, `Vector2.Min()` and `Vector2.Max()`, you do not need Vector.cs. But be sure to link your namespace under the other 3 files.
 
