@@ -7,8 +7,8 @@ namespace CDT;
 
 public enum VertexInsertionOrder { Auto, AsProvided }
 public enum SuperGeometryType { SuperTriangle, Custom }
-public enum IntersectingConstraintEdges { Ignore, Resolve }
-public enum PtTriLocation { Inside, Outside, OnEdge1, OnEdge2, OnEdge3 }
+public enum IntersectingConstraintEdges { NotAllowed, TryResolve, DontCheck }
+public enum PtTriLocation { Inside, Outside, OnEdge1, OnEdge2, OnEdge3, OnVertex }
 public enum PtLineLocation { Left, Right, OnLine }
 public enum RefinementCriterion { SmallestAngle, LargestArea }
 public struct Box
@@ -438,72 +438,6 @@ public class Triangle
         Expansion D = B + TwoTwoDiff(acxtail, bcy, acytail, bcx) + TwoTwoDiff(acx, bcytail, acy, bcxtail) + TwoTwoDiff(acxtail, bcytail, acytail, bcxtail);
         return D.mostSignificant();
     }
-    //public static double Orient2D(double ax, double ay, double bx, double by, double cx, double cy) => (ax - bx) * (by - cy) + (ay - by) * (cx - bx);
-    public int[] vertices = new int[3], neighbors = new int[3];
-    public (int, int) Next(int i)
-    {
-        Debug.Assert(vertices[0] == i || vertices[1] == i || vertices[2] == i);
-        return vertices[0] == i ? (neighbors[0], vertices[1]) : vertices[1] == i ? (neighbors[1], vertices[2]) : (neighbors[2], vertices[0]);
-    }
-    public (int, int) Prev(int i)
-    {
-        Debug.Assert(vertices[0] == i || vertices[1] == i || vertices[2] == i);
-        return vertices[0] == i ? (neighbors[2], vertices[2]) : vertices[1] == i ? (neighbors[0], vertices[0]) : (neighbors[1], vertices[1]);
-    }
-    public bool ContainsVertex(int i) => vertices[0] == i || vertices[1] == i || vertices[2] == i;
-    public static int CCW(int i) => (i + 1) % 3;
-    public static int CW(int i) => (i + 2) % 3;
-    public static bool IsOnEdge(PtTriLocation location) => location > PtTriLocation.Outside;
-    public static int EdgeNeighbor(PtTriLocation location)
-    { Debug.Assert(location >= PtTriLocation.OnEdge1); return location - PtTriLocation.OnEdge1; }
-    public static PtLineLocation LocatePointLine(Vector2 p, Vector2 v1, Vector2 v2, double orientationTolerance = 0)
-        => ClassifyOrientation(Orient2D(v1.X, v1.Y, v2.X, v2.Y, p.X, p.Y), orientationTolerance);
-    public static PtLineLocation ClassifyOrientation(double orientation, double orientationTolerance = 0) =>
-        orientation < -orientationTolerance ? PtLineLocation.Right : orientation > orientationTolerance ? PtLineLocation.Left : PtLineLocation.OnLine;
-    public static PtTriLocation LocatePointTriangle(Vector2 p, Vector2 v1, Vector2 v2, Vector2 v3)
-    {
-        PtTriLocation result = PtTriLocation.Inside;
-        PtLineLocation edgeCheck = LocatePointLine(p, v1, v2);
-        if (edgeCheck == PtLineLocation.Right) return PtTriLocation.Outside;
-        if (edgeCheck == PtLineLocation.OnLine) result = PtTriLocation.OnEdge1;
-        edgeCheck = LocatePointLine(p, v2, v3);
-        if (edgeCheck == PtLineLocation.Right) return PtTriLocation.Outside;
-        if (edgeCheck == PtLineLocation.OnLine) result = PtTriLocation.OnEdge2;
-        edgeCheck = LocatePointLine(p, v3, v1);
-        if (edgeCheck == PtLineLocation.Right) return PtTriLocation.Outside;
-        if (edgeCheck == PtLineLocation.OnLine) result = PtTriLocation.OnEdge3;
-        return result;
-    }
-    public static int OppositeNeghbor(int vertIndex) => vertIndex >= 0 && vertIndex < 3 ? (vertIndex + 1) % 3 : throw new ArgumentOutOfRangeException("Invalid vertex index");
-    public static int OppositeVertex(int neighborIndex) => neighborIndex >= 0 && neighborIndex < 3 ? (neighborIndex + 2) % 3 : throw new ArgumentOutOfRangeException("Invalid neighbor index");
-    public static int OpposedTriangleIndex(int[] vv, int index)
-    {
-        Debug.Assert(vv[0] == index || vv[1] == index || vv[2] == index);
-        return vv[0] == index ? 1 : vv[1] == index ? 2 : 0;
-    }
-    public static int EdgeNeighborIndex(int[] vv, int iVedge1, int iVedge2)
-    {
-        Debug.Assert(vv[0] == iVedge1 || vv[1] == iVedge1 || vv[2] == iVedge1);
-        Debug.Assert(vv[0] == iVedge2 || vv[1] == iVedge2 || vv[2] == iVedge2);
-        Debug.Assert((vv[0] != iVedge1 && vv[0] != iVedge2) || (vv[1] != iVedge1 && vv[1] != iVedge2) || (vv[2] != iVedge1 && vv[2] != iVedge2));
-        if (vv[0] == iVedge1) return vv[1] == iVedge2 ? 0 : 2;
-        if (vv[0] == iVedge2) return vv[1] == iVedge1 ? 0 : 2;
-        return 1;
-    }
-    public static int OpposedVertexIndex(int[] nn, int iTopo)
-    {
-        Debug.Assert(nn[0] == iTopo || nn[1] == iTopo || nn[2] == iTopo);
-        return nn[0] == iTopo ? 2 : nn[1] == iTopo ? 0 : 1;
-    }
-    public static int VertexIndex(int[] vv, int iV)
-    {
-        Debug.Assert(vv[0] == iV || vv[1] == iV || vv[2] == iV);
-        return vv[0] == iV ? 0 : vv[1] == iV ? 1 : 2;
-    }
-    public static int OpposedTriangle(Triangle tri, int iVert) => tri.neighbors[OpposedTriangleIndex(tri.vertices, iVert)];
-    public static int EdgeNeighbor(Triangle tri, int iVedge1, int iVedge2) => tri.neighbors[EdgeNeighborIndex(tri.vertices, iVedge1, iVedge2)];
-    public static int OpposedVertex(Triangle tri, int iTopo) => tri.vertices[OpposedVertexIndex(tri.neighbors, iTopo)];
-    
     static double InCircle(double ax, double ay, double bx, double by, double cx, double cy, double dx, double dy)
     {
         Expansion ab = TwoTwoDiff(ax, by, bx, ay);
@@ -579,6 +513,72 @@ public class Triangle
         if (Math.Abs(det) >= Math.Abs(errbound)) return det > 0;
         return InCircle(v1.X, v1.Y, v2.X, v2.Y, v3.X, v3.Y, p.X, p.Y) > 0;
     }
+    //public static double Orient2D(double ax, double ay, double bx, double by, double cx, double cy) => (ax - bx) * (by - cy) + (ay - by) * (cx - bx);
+    public int[] vertices = new int[3], neighbors = new int[3];
+    public (int, int) Next(int i)
+    {
+        Debug.Assert(vertices[0] == i || vertices[1] == i || vertices[2] == i);
+        return vertices[0] == i ? (neighbors[0], vertices[1]) : vertices[1] == i ? (neighbors[1], vertices[2]) : (neighbors[2], vertices[0]);
+    }
+    public (int, int) Prev(int i)
+    {
+        Debug.Assert(vertices[0] == i || vertices[1] == i || vertices[2] == i);
+        return vertices[0] == i ? (neighbors[2], vertices[2]) : vertices[1] == i ? (neighbors[0], vertices[0]) : (neighbors[1], vertices[1]);
+    }
+    public bool ContainsVertex(int i) => vertices[0] == i || vertices[1] == i || vertices[2] == i;
+    public static int CCW(int i) => (i + 1) % 3;
+    public static int CW(int i) => (i + 2) % 3;
+    public static bool IsOnEdge(PtTriLocation location) => location == PtTriLocation.OnEdge1 || location == PtTriLocation.OnEdge2 || location == PtTriLocation.OnEdge3;
+    public static int EdgeNeighbor(PtTriLocation location)
+    { Debug.Assert(IsOnEdge(location)); return location - PtTriLocation.OnEdge1; }
+    public static PtLineLocation LocatePointLine(Vector2 p, Vector2 v1, Vector2 v2, double orientationTolerance = 0)
+        => ClassifyOrientation(Orient2D(v1.X, v1.Y, v2.X, v2.Y, p.X, p.Y), orientationTolerance);
+    public static PtLineLocation ClassifyOrientation(double orientation, double orientationTolerance = 0) =>
+        orientation < -orientationTolerance ? PtLineLocation.Right : orientation > orientationTolerance ? PtLineLocation.Left : PtLineLocation.OnLine;
+    public static PtTriLocation LocatePointTriangle(Vector2 p, Vector2 v1, Vector2 v2, Vector2 v3)
+    {
+        PtTriLocation result = PtTriLocation.Inside;
+        PtLineLocation edgeCheck = LocatePointLine(p, v1, v2);
+        if (edgeCheck == PtLineLocation.Right) return PtTriLocation.Outside;
+        if (edgeCheck == PtLineLocation.OnLine) result = PtTriLocation.OnEdge1;
+        edgeCheck = LocatePointLine(p, v2, v3);
+        if (edgeCheck == PtLineLocation.Right) return PtTriLocation.Outside;
+        if (edgeCheck == PtLineLocation.OnLine) result = result == PtTriLocation.Inside ? PtTriLocation.OnEdge2 : PtTriLocation.OnVertex;
+        edgeCheck = LocatePointLine(p, v3, v1);
+        if (edgeCheck == PtLineLocation.Right) return PtTriLocation.Outside;
+        if (edgeCheck == PtLineLocation.OnLine) result = result == PtTriLocation.Inside ? PtTriLocation.OnEdge3 : PtTriLocation.OnVertex;
+        return result;
+    }
+    public static int OppositeNeghbor(int vertIndex) => vertIndex >= 0 && vertIndex < 3 ? (vertIndex + 1) % 3 : throw new ArgumentOutOfRangeException("Invalid vertex index");
+    public static int OppositeVertex(int neighborIndex) => neighborIndex >= 0 && neighborIndex < 3 ? (neighborIndex + 2) % 3 : throw new ArgumentOutOfRangeException("Invalid neighbor index");
+    public static int OpposedTriangleIndex(int[] vv, int index)
+    {
+        Debug.Assert(vv[0] == index || vv[1] == index || vv[2] == index);
+        return vv[0] == index ? 1 : vv[1] == index ? 2 : 0;
+    }
+    public static int EdgeNeighborIndex(int[] vv, int iVedge1, int iVedge2)
+    {
+        Debug.Assert(vv[0] == iVedge1 || vv[1] == iVedge1 || vv[2] == iVedge1);
+        Debug.Assert(vv[0] == iVedge2 || vv[1] == iVedge2 || vv[2] == iVedge2);
+        Debug.Assert((vv[0] != iVedge1 && vv[0] != iVedge2) || (vv[1] != iVedge1 && vv[1] != iVedge2) || (vv[2] != iVedge1 && vv[2] != iVedge2));
+        if (vv[0] == iVedge1) return vv[1] == iVedge2 ? 0 : 2;
+        if (vv[0] == iVedge2) return vv[1] == iVedge1 ? 0 : 2;
+        return 1;
+    }
+    public static int OpposedVertexIndex(int[] nn, int iTopo)
+    {
+        Debug.Assert(nn[0] == iTopo || nn[1] == iTopo || nn[2] == iTopo);
+        return nn[0] == iTopo ? 2 : nn[1] == iTopo ? 0 : 1;
+    }
+    public static int VertexIndex(int[] vv, int iV)
+    {
+        Debug.Assert(vv[0] == iV || vv[1] == iV || vv[2] == iV);
+        return vv[0] == iV ? 0 : vv[1] == iV ? 1 : 2;
+    }
+    public static int OpposedTriangle(Triangle tri, int iVert) => tri.neighbors[OpposedTriangleIndex(tri.vertices, iVert)];
+    public static int EdgeNeighbor(Triangle tri, int iVedge1, int iVedge2) => tri.neighbors[EdgeNeighborIndex(tri.vertices, iVedge1, iVedge2)];
+    public static int OpposedVertex(Triangle tri, int iTopo) => tri.vertices[OpposedVertexIndex(tri.neighbors, iTopo)];
+    
     public static bool VerticesShareEdge(List<int> aTris, List<int> bTris)
     {
         for (int i = 0; i < aTris.Count; i++) if (bTris.Contains(aTris[i])) return true;

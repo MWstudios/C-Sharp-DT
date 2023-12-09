@@ -124,8 +124,8 @@ public class CDT
     }
     public void InsertEdges(Span<Edge> edges)
     {
-        List<TriangulatePseudoPolygonTask> tppIterations = new(); List<Edge> remaining = new();
         if (IsFinalized()) throw new ArgumentException("Triangulation was finalized with 'erase...' method. Inserting new edges is not possible");
+        List<TriangulatePseudoPolygonTask> tppIterations = new(); List<Edge> remaining = new();
         for (int i = 0; i < edges.Length; i++)
         {
             Edge edge = new(edges[i].iV1 + nTargetVerts, edges[i].iV2 + nTargetVerts);
@@ -135,8 +135,8 @@ public class CDT
     }
     public void InsertEdges(IEnumerable<Edge> edges)
     {
-        List<TriangulatePseudoPolygonTask> tppIterations = new(); List<Edge> remaining = new();
         if (IsFinalized()) throw new ArgumentException("Triangulation was finalized with 'erase...' method. Inserting new edges is not possible");
+        List<TriangulatePseudoPolygonTask> tppIterations = new(); List<Edge> remaining = new();
         foreach (var i in edges)
         {
             Edge edge = new(i.iV1 + nTargetVerts, i.iV2 + nTargetVerts);
@@ -366,7 +366,10 @@ public class CDT
     {
         nTargetVerts = 3; superGeomType = SuperGeometryType.SuperTriangle;
         Vector2 center = (box.min + box.max) / 2;
-        double r = Vector2.Distance(box.max, box.min) / 2 * 1.1, R = r * 2, shiftX = R * Math.Sqrt(3) / 2;
+        double r = Vector2.Distance(box.max, box.min) / 2;
+        r = r > 0 ? r * 1.1 : 1e-6;
+        while (center.Y <= center.Y - r) r *= 2;
+        double R = r * 2, shiftX = R * Math.Sqrt(3) / 2;
         Vector2 posV1 = center - new Vector2(shiftX, r), posV2 = center + new Vector2(shiftX, -r), posV3 = center + new Vector2(0, R);
         AddNewVertex(posV1, 0); AddNewVertex(posV2, 0); AddNewVertex(posV3, 0);
         AddTriangle(new() { vertices = new[] { 0, 1, 2 }, neighbors = new[] { noNeighbor, noNeighbor, noNeighbor } });
@@ -380,17 +383,17 @@ public class CDT
     }
     void InsertVertex(int iVert, int walkStart)
     {
-        Vector2 v = vertices[iVert]; int[] trisAt = WalkingSearchTriangleAt(v, walkStart);
+        int[] trisAt = WalkingSearchTriangleAt(iVert, walkStart);
         Stack<int> triStack = trisAt[1] == noNeighbor ? InsertVertexInsideTriangle(iVert, trisAt[0]) : InsertVertexOnEdge(iVert, trisAt[0], trisAt[1]);
-        EnsureDelaunayByEdgeFlips(v, iVert, triStack);
+        EnsureDelaunayByEdgeFlips(iVert, triStack);
     }
-    void EnsureDelaunayByEdgeFlips(Vector2 v1, int iV1, Stack<int> triStack)
+    void EnsureDelaunayByEdgeFlips(int iV1, Stack<int> triStack)
     {
         while (triStack.Count > 0)
         {
             int iT = triStack.Pop();
             EdgeFlipInfo(iT, iV1, out int iTopo, out int iV2, out int iV3, out int iV4, out int n1, out int n2, out int n3, out int n4);
-            if (iTopo != noNeighbor && IsFlipNeeded(v1, iV1, iV2, iV3, iV4))
+            if (iTopo != noNeighbor && IsFlipNeeded(iV1, iV2, iV3, iV4))
             {
                 FlipEdge(iT, iTopo, iV1, iV2, iV3, iV4, n1, n2, n3, n4); triStack.Push(iT); triStack.Push(iTopo);
             }
@@ -399,12 +402,12 @@ public class CDT
     List<Edge> InsertVertex_FlipFixedEdges(int iV1)
     {
         List<Edge> flippedFixedEdges = new(); Vector2 v1 = vertices[iV1]; int startVertex = nearPtLocator.Nearest(v1, vertices).Item2;
-        int[] trisAt = WalkingSearchTriangleAt(v1, startVertex);
+        int[] trisAt = WalkingSearchTriangleAt(iV1, startVertex);
         Stack<int> triStack = trisAt[1] == noNeighbor ? InsertVertexInsideTriangle(iV1, trisAt[0]) : InsertVertexOnEdge(iV1, trisAt[0], trisAt[1]);
         while (triStack.Count > 0)
         {
             int iT = triStack.Pop(); EdgeFlipInfo(iT, iV1, out int iTopo, out int iV2, out int iV3, out int iV4, out int n1, out int n2, out int n3, out int n4);
-            if (iTopo != noNeighbor && IsFlipNeeded(v1, iV1, iV2, iV3, iV4))
+            if (iTopo != noNeighbor && IsFlipNeeded(iV1, iV2, iV3, iV4))
             {
                 Edge flippedEdge = new(iV2, iV4);
                 if (fixedEdges.Count > 0 && fixedEdges.Contains(flippedEdge)) flippedFixedEdges.Add(flippedEdge);
@@ -446,49 +449,66 @@ public class CDT
         if (iT == noNeighbor)
         { Edge edgePart = new(iA, iVL); FixEdge(edgePart, originalEdge); remaining.Add(new(iVL, iB)); return; }
         Triangle t = triangles[iT];
-        List<int> intersected = new() { iT }, polyL = new() { iA, iVL }, polyR = new() { iA, iVR },
-            outerTrisL = new() { Triangle.EdgeNeighbor(t, iA, iVL) }, outerTrisR = new() { Triangle.EdgeNeighbor(t, iA, iVR) };
-        int iV = iA, nChainedHangingEdgesL = 0, nChainedHangingEdgesR = 0;
+        List<int> intersected = new() { iT }, polyL = new() { iA, iVL }, polyR = new() { iA, iVR };
+        Dictionary<Edge, int> outerTris = new() { { new(iA, iVL), Triangle.EdgeNeighbor(t, iA, iVL) }, { new(iA, iVR), Triangle.EdgeNeighbor(t, iA, iVR) } };
+        int iV = iA;
         while (!t.ContainsVertex(iB))
         {
             int iTopo = Triangle.OpposedTriangle(t, iV); Triangle tOpo = triangles[iTopo];
             int iVopo = Triangle.OpposedVertex(tOpo, iT);
-            if (intersectingEdgesStrategy == IntersectingConstraintEdges.Resolve && fixedEdges.Contains(new(iVL, iVR)))
+            switch (intersectingEdgesStrategy)
             {
-                Vector2 newV = IntersectionPosition(vertices[iA], vertices[iB], vertices[iVL], vertices[iVR]);
-                int iNewVert = SplitFixedEdgeAt(new(iVL, iVR), newV, iT, iTopo);
-                remaining.Add(new(iA, iNewVert)); remaining.Add(new(iNewVert, iB)); return;
+                case IntersectingConstraintEdges.NotAllowed:
+                    if (fixedEdges.Contains(new(iVL, iVR)))
+                    {
+                        Edge e1 = originalEdge, e2 = new(iVL, iVR);
+                        e2 = pieceToOriginals.ContainsKey(e2) ? pieceToOriginals[e2][0] : e2;
+                        e1 = new(e1.iV1 - nTargetVerts, e1.iV2 - nTargetVerts);
+                        e2 = new(e2.iV1 - nTargetVerts, e2.iV2 - nTargetVerts);
+                        throw new Exception("Intersecting constraints error");
+                    }
+                    break;
+                case IntersectingConstraintEdges.TryResolve:
+                    if (!fixedEdges.Contains(new(iVL, iVR))) break;
+                    Vector2 newV = IntersectionPosition(vertices[iA], vertices[iB], vertices[iVL], vertices[iVR]);
+                    int iNewVert = SplitFixedEdgeAt(new(iVL, iVR), newV, iT, iTopo);
+                    remaining.Add(new(iA, iNewVert)); remaining.Add(new(iNewVert, iB)); return;
+                case IntersectingConstraintEdges.DontCheck:
+                    Debug.Assert(!fixedEdges.Contains(new(iVL, iVR)));
+                    break;
+                default:
+                    break;
             }
             PtLineLocation loc = Triangle.LocatePointLine(vertices[iVopo], a, b, distanceTolerance);
             if (loc == PtLineLocation.Left)
             {
-                int prev = polyL.Count - 2 - 2 * nChainedHangingEdgesL;
-                if (iVopo == polyL[prev]) { ++nChainedHangingEdgesL; outerTrisL[prev] = noNeighbor; outerTrisL.Add(noNeighbor); }
-                else { nChainedHangingEdgesL = 0; outerTrisL.Add(Triangle.EdgeNeighbor(tOpo, polyL[^1], iVopo)); }
+                Edge e = new(polyL[^1], iVopo);
+                int outer = Triangle.EdgeNeighbor(tOpo, e.iV1, e.iV2);
+                if (!outerTris.TryAdd(e, outer)) outerTris[e] = noNeighbor;
                 polyL.Add(iVopo); iV = iVL; iVL = iVopo;
             }
             else if (loc == PtLineLocation.Right)
             {
-                int prev = polyR.Count - 2 - 2 * nChainedHangingEdgesR;
-                if (iVopo == polyR[prev]) { ++nChainedHangingEdgesR; outerTrisR[prev] = noNeighbor; outerTrisR.Add(noNeighbor); }
-                else { nChainedHangingEdgesR = 0; outerTrisR.Add(Triangle.EdgeNeighbor(tOpo, polyR[^1], iVopo)); }
+                Edge e = new(polyR[^1], iVopo);
+                int outer = Triangle.EdgeNeighbor(tOpo, polyR[^1], iVopo);
+                if (!outerTris.TryAdd(e, outer)) outerTris[e] = noNeighbor;
                 polyR.Add(iVopo); iV = iVR; iVR = iVopo;
             }
             else iB = iVopo;
             intersected.Add(iTopo);
             iT = iTopo; t = triangles[iT];
         }
-        outerTrisL.Add(Triangle.EdgeNeighbor(t, polyL[^1], iB));
-        outerTrisR.Add(Triangle.EdgeNeighbor(t, polyR[^1], iB));
+        outerTris[new(polyL[^1], iB)] = Triangle.EdgeNeighbor(t, polyL[^1], iB);
+        outerTris[new(polyR[^1], iB)] = Triangle.EdgeNeighbor(t, polyR[^1], iB);
         polyL.Add(iB); polyR.Add(iB);
         Debug.Assert(intersected.Count > 0);
         if (vertTris[iA] == intersected[0]) PivotVertexTriangleCW(iA);
         if (vertTris[iB] == intersected[^1]) PivotVertexTriangleCW(iB);
         foreach (var i in intersected) MakeDummy(i);
-        polyR.Reverse(); outerTrisR.Reverse();
+        polyR.Reverse();
         int iTL = AddTriangle(), iTR = AddTriangle();
-        TriangulatePseudoPolygon(polyL, outerTrisL, iTL, iTR, tppIterations);
-        TriangulatePseudoPolygon(polyR, outerTrisR, iTR, iTL, tppIterations);
+        TriangulatePseudoPolygon(polyL, outerTris, iTL, iTR, tppIterations);
+        TriangulatePseudoPolygon(polyR, outerTris, iTR, iTL, tppIterations);
         if (iB != edge.iV2)
         {
             Edge edgePart = new(iA, iB); FixEdge(edgePart, originalEdge);
@@ -543,13 +563,31 @@ public class CDT
         {
             int iTopo = Triangle.OpposedTriangle(t, iV); Triangle tOpo = triangles[iTopo];
             int iVopo = Triangle.OpposedVertex(tOpo, iT); Vector2 vOpo = vertices[iVopo];
-            if (intersectingEdgesStrategy == IntersectingConstraintEdges.Resolve && fixedEdges.Contains(new(iVleft, iVright)))
+            switch (intersectingEdgesStrategy)
             {
-                Vector2 newV = IntersectionPosition(vertices[iA], vertices[iB], vertices[iVleft], vertices[iVright]);
-                int iNewVert = SplitFixedEdgeAt(new(iVleft, iVright), newV, iT, iTopo);
-                remaining.Add(new(new(iNewVert, iB), originals, overlaps));
-                remaining.Add(new(new(iA, iNewVert), originals, overlaps));
-                return;
+                case IntersectingConstraintEdges.NotAllowed:
+                    if (fixedEdges.Contains(new(iVleft, iVright)))
+                    {
+                        Edge e1 = pieceToOriginals.ContainsKey(edge) ? pieceToOriginals[edge][0] : edge,
+                            e2 = new(iVleft, iVright);
+                        e2 = pieceToOriginals.ContainsKey(e2) ? pieceToOriginals[e2][0] : e2;
+                        e1 = new(e1.iV1 - nTargetVerts, e1.iV2 - nTargetVerts);
+                        e2 = new(e2.iV1 - nTargetVerts, e2.iV2 - nTargetVerts);
+                        throw new Exception("Intersecting constraints error");
+                    }
+                    break;
+                case IntersectingConstraintEdges.TryResolve:
+                    if (!fixedEdges.Contains(new(iVleft, iVright))) break;
+                    Vector2 newV = IntersectionPosition(vertices[iA], vertices[iB], vertices[iVleft], vertices[iVright]);
+                    int iNewVert = SplitFixedEdgeAt(new(iVleft, iVright), newV, iT, iTopo);
+                    remaining.Add(new(new(iNewVert, iB), originals, overlaps));
+                    remaining.Add(new(new(iA, iNewVert), originals, overlaps));
+                    return;
+                case IntersectingConstraintEdges.DontCheck:
+                    Debug.Assert(!fixedEdges.Contains(new(iVleft, iVright)));
+                    break;
+                default:
+                    break;
             }
             iT = iTopo; t = triangles[iT];
             PtLineLocation loc = Triangle.LocatePointLine(vOpo, a, b, distanceTolerance);
@@ -692,19 +730,25 @@ public class CDT
                 PtLineLocation edgeCheck = Triangle.LocatePointLine(pos, vStart, vEnd);
                 int iN = t.neighbors[i];
                 if (edgeCheck == PtLineLocation.Right && iN != noNeighbor)
-                { found = false; currTri = t.neighbors[i]; break; }
+                { found = false; currTri = iN; break; }
             }
         }
         return currTri;
     }
-    int[] WalkingSearchTriangleAt(Vector2 pos, int startVertex)
+    int[] WalkingSearchTriangleAt(int iV, int startVertex)
     {
         int[] out_ = new int[] { noNeighbor, noNeighbor };
-        int iT = WalkTriangles(startVertex, pos);
+        Vector2 v = vertices[iV];
+        int iT = WalkTriangles(startVertex, v);
         Triangle t = triangles[iT];
         Vector2 v1 = vertices[t.vertices[0]], v2 = vertices[t.vertices[1]], v3 = vertices[t.vertices[2]];
-        PtTriLocation loc = Triangle.LocatePointTriangle(pos, v1, v2, v3);
+        PtTriLocation loc = Triangle.LocatePointTriangle(v, v1, v2, v3);
         if (loc == PtTriLocation.Outside) throw new MissingMemberException("No triangle was found at position");
+        if (loc == PtTriLocation.OnVertex)
+        {
+            int iDupe = v1 == v ? t.vertices[0] : v2 == v ? t.vertices[1] : t.vertices[2];
+            throw new DuplicateWaitObjectException($"Duplicate vertex error: {iV - nTargetVerts}, {iDupe - nTargetVerts}");
+        }
         out_[0] = iT; if (Triangle.IsOnEdge(loc)) out_[1] = t.neighbors[Triangle.EdgeNeighbor(loc)];
         return out_;
     }
@@ -793,10 +837,10 @@ public class CDT
     *                      \|/
     *                       v2
     */
-    bool IsFlipNeeded(Vector2 v, int iV1, int iV2, int iV3, int iV4)
+    bool IsFlipNeeded(int iV1, int iV2, int iV3, int iV4)
     {
         if (fixedEdges.Contains(new(iV2, iV4))) return false;
-        Vector2 v2 = vertices[iV2], v3 = vertices[iV3], v4 = vertices[iV4];
+        Vector2 v1 = vertices[iV1], v2 = vertices[iV2], v3 = vertices[iV3], v4 = vertices[iV4];
         if (superGeomType == SuperGeometryType.SuperTriangle)
         {
             // If flip-candidate edge touches super-triangle in-circumference
@@ -808,28 +852,28 @@ public class CDT
                 // does original edge also touch super-triangle?
                 if (iV2 < 3)
                     return Triangle.LocatePointLine(v2, v3, v4) ==
-                           Triangle.LocatePointLine(v, v3, v4);
+                           Triangle.LocatePointLine(v1, v3, v4);
                 if (iV4 < 3)
                     return Triangle.LocatePointLine(v4, v2, v3) ==
-                           Triangle.LocatePointLine(v, v2, v3);
+                           Triangle.LocatePointLine(v1, v2, v3);
                 return false; // original edge does not touch super-triangle
             }
             if (iV3 < 3) // flip-candidate edge touches super-triangle
             {
                 // does original edge also touch super-triangle?
                 if (iV2 < 3)
-                    return Triangle.LocatePointLine(v2, v, v4) == Triangle.LocatePointLine(v3, v, v4);
+                    return Triangle.LocatePointLine(v2, v1, v4) == Triangle.LocatePointLine(v3, v1, v4);
                 if (iV4 < 3)
-                    return Triangle.LocatePointLine(v4, v2, v) == Triangle.LocatePointLine(v3, v2, v);
+                    return Triangle.LocatePointLine(v4, v2, v1) == Triangle.LocatePointLine(v3, v2, v1);
                 return false; // original edge does not touch super-triangle
             }
             // flip-candidate edge does not touch super-triangle
             if (iV2 < 3)
-                return Triangle.LocatePointLine(v2, v3, v4) == Triangle.LocatePointLine(v, v3, v4);
+                return Triangle.LocatePointLine(v2, v3, v4) == Triangle.LocatePointLine(v1, v3, v4);
             if (iV4 < 3)
-                return Triangle.LocatePointLine(v4, v2, v3) == Triangle.LocatePointLine(v, v2, v3);
+                return Triangle.LocatePointLine(v4, v2, v3) == Triangle.LocatePointLine(v1, v2, v3);
         }
-        return Triangle.IsInCircumcircle(v, v2, v3, v4);
+        return Triangle.IsInCircumcircle(v1, v2, v3, v4);
     }
     bool IsRefinementNeeded(Triangle tri, RefinementCriterion refinementCriterion, double refinementThreshold)
     {
@@ -871,7 +915,8 @@ public class CDT
         }
         return encroachedEdges;
     }
-    List<int> ResolveEncroachedEdges(Queue<Edge> encroachedEdges, ref int remainingVertexBudget, int steinerVerticesOffset, Vector2? circumcenterOrNull, RefinementCriterion refinementCriterion, double badTriangleThreshold)
+    List<int> ResolveEncroachedEdges(Queue<Edge> encroachedEdges, ref int remainingVertexBudget, int steinerVerticesOffset,
+        Vector2? circumcenterOrNull, RefinementCriterion refinementCriterion, double badTriangleThreshold)
     {
         List<int> badTriangles = new();
         while (encroachedEdges.Count > 0 && remainingVertexBudget > 0)
@@ -929,16 +974,14 @@ public class CDT
     {
         Debug.Assert(iT != noNeighbor); triangles[iT].neighbors[Triangle.EdgeNeighborIndex(triangles[iT].vertices, iVedge1, iVedge2)] = newNeighbor;
     }
-    void TriangulatePseudoPolygon(List<int> poly, List<int> outerTris, int iT, int iN, List<TriangulatePseudoPolygonTask> iterations)
+    void TriangulatePseudoPolygon(List<int> poly, Dictionary<Edge, int> outerTris, int iT, int iN, List<TriangulatePseudoPolygonTask> iterations)
     {
         Debug.Assert(poly.Count > 2);
-        for (int i = 1; i < outerTris.Count; i++) if (outerTris[i] == noNeighbor) vertTris[poly[i]] = noNeighbor;
         iterations.Clear();
         iterations.Add(new(0, poly.Count - 1, iT, iN, 0));
         while (iterations.Count > 0) TriangulatePseudoPolygonIteration(poly, outerTris, iterations);
-        for (int i = 0; i < poly.Count; i++) Debug.Assert(vertTris[poly[i]] != noNeighbor);
     }
-    void TriangulatePseudoPolygonIteration(List<int> poly, List<int> outerTris, List<TriangulatePseudoPolygonTask> iterations)
+    void TriangulatePseudoPolygonIteration(List<int> poly, Dictionary<Edge, int> outerTris, List<TriangulatePseudoPolygonTask> iterations)
     {
         Debug.Assert(iterations.Count > 0);
         (int iA, int iB, int iT, int iParent, int iInParent) = iterations[^1]; iterations.RemoveAt(iterations.Count - 1);
@@ -947,29 +990,31 @@ public class CDT
         if (iB - iC > 1) { int iNext = AddTriangle(); iterations.Add(new(iC, iB, iNext, iT, 1)); }
         else
         {
-            int outerTri = outerTris[iC];
+            Edge outerEdge = new(b, c); int outerTri = outerTris[outerEdge];
             if (outerTri != noNeighbor)
             {
                 Debug.Assert(outerTri != iT);
                 triangles[iT].neighbors[1] = outerTri;
                 ChangeNeighbor(outerTri, c, b, iT);
             }
+            else outerTris[outerEdge] = iT;
         }
         if (iC - iA > 1) { int iNext = AddTriangle(); iterations.Add(new(iA, iC, iNext, iT, 2)); }
         else
         {
-            int outerTri = outerTris[iA] != noNeighbor ? outerTris[iA] : vertTris[c];
+            Edge outerEdge = new(c, a); int outerTri = outerTris[outerEdge];
             if (outerTri != noNeighbor)
             {
                 Debug.Assert(outerTri != iT);
                 triangles[iT].neighbors[2] = outerTri;
                 ChangeNeighbor(outerTri, c, a, iT);
             }
+            else outerTris[outerEdge] = iT;
         }
         triangles[iParent].neighbors[iInParent] = iT;
         triangles[iT].neighbors[0] = iParent;
         triangles[iT].vertices = new[] { a, b, c };
-        SetAdjancentTriangle(a, iT); SetAdjancentTriangle(c, iT);
+        SetAdjancentTriangle(c, iT);
     }
     int FindDelaunayPoint(List<int> poly, int iA, int iB)
     {
@@ -1075,7 +1120,7 @@ public class CDT
         AddNewVertex(splitVert, noNeighbor);
         Stack<int> triStack = InsertVertexOnEdge(isplitVert, iT, iTopo);
         TryAddVertexToLocator(isplitVert);
-        EnsureDelaunayByEdgeFlips(splitVert, isplitVert, triStack);
+        EnsureDelaunayByEdgeFlips(isplitVert, triStack);
         return isplitVert;
     }
     /// <summary>Split fixed edge and add a split vertex into the triangulation</summary>
