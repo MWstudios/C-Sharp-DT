@@ -35,7 +35,7 @@ public struct Box
 public class Edge
 {
     public int iV1, iV2;
-    public Edge(int iV1, int iV2) { this.iV1 = iV1; this.iV2 = iV2; }
+    public Edge(int iV1, int iV2) { if (iV1 > iV2) (iV1, iV2) = (iV2, iV1); this.iV1 = iV1; this.iV2 = iV2; }
     public static bool operator ==(Edge a, Edge b) => a.iV1 == b.iV1 && a.iV2 == b.iV2;
     public static bool operator !=(Edge a, Edge b) => a.iV1 != b.iV1 || a.iV2 != b.iV2;
     public override int GetHashCode()
